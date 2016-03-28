@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/buger/jsonparser/strbytes"
+	"github.com/pendo-io/jsonparser/strbytes"
 	"strconv"
 )
 
