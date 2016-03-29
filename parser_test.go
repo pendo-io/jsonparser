@@ -151,42 +151,36 @@ var getTests = []Test{
 		json:    `{"a":"b"}`,
 		path:    []string{"c"},
 		isFound: false,
-		isErr:   true,
 	},
 	Test{
 		desc:    "non-existent key 2",
 		json:    `{"a":"b"}`,
 		path:    []string{"b"},
 		isFound: false,
-		isErr:   true,
 	},
 	Test{
 		desc:    "non-existent key 3",
 		json:    `{"aa":"b"}`,
 		path:    []string{"a"},
 		isFound: false,
-		isErr:   true,
 	},
 	Test{
 		desc:    "apply scope of parent when search for nested key",
 		json:    `{"a": { "b": 1}, "c": 2 }`,
 		path:    []string{"a", "b", "c"},
 		isFound: false,
-		isErr:   true,
 	},
 	Test{
 		desc:    `apply scope to key level`,
 		json:    `{"a": { "b": 1}, "c": 2 }`,
 		path:    []string{"b"},
 		isFound: false,
-		isErr:   true,
 	},
 	Test{
 		desc:    `handle escaped quote in key name in JSON`,
 		json:    `{"key\"key": 1}`,
 		path:    []string{"key"},
 		isFound: false,
-		isErr:   true,
 	},
 
 	// Error/invalid tests
@@ -195,7 +189,6 @@ var getTests = []Test{
 		json:    `{"key\"key": 1}`,
 		path:    []string{"key"},
 		isFound: false,
-		isErr:   true,
 	},
 	Test{
 		desc:    `missing closing brace, but can still find key`,

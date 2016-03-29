@@ -178,7 +178,7 @@ If no keys provided it will try to extract closest JSON value (simple ones or ob
 func Get(data []byte, keys ...string) (value []byte, dataType int, offset int, err error) {
 	if len(keys) > 0 {
 		if offset = searchKeys(data, keys...); offset == -1 {
-			return []byte{}, NotExist, -1, errors.New("Key path not found")
+			return []byte{}, NotExist, -1, nil
 		}
 	}
 
