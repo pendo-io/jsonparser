@@ -11,7 +11,7 @@ import (
 var activeTest = ""
 
 func toArray(data []byte) (result [][]byte) {
-	ArrayEach(data, func(value []byte, dataType int, offset int, err error) {
+	ArrayEach(data, func(value []byte, dataType ValueType, offset int, err error) {
 		result = append(result, value)
 	})
 
@@ -19,7 +19,7 @@ func toArray(data []byte) (result [][]byte) {
 }
 
 func toStringArray(data []byte) (result []string) {
-	ArrayEach(data, func(value []byte, dataType int, offset int, err error) {
+	ArrayEach(data, func(value []byte, dataType ValueType, offset int, err error) {
 		result = append(result, string(value))
 	})
 
@@ -396,7 +396,7 @@ var getArrayTests = []Test{
 
 // checkFoundAndNoError checks the dataType and error return from Get*() against the test case expectations.
 // Returns true the test should proceed to checking the actual data returned from Get*(), or false if the test is finished.
-func checkFoundAndNoError(t *testing.T, testKind string, test Test, jtype int, value interface{}, err error) bool {
+func checkFoundAndNoError(t *testing.T, testKind string, test Test, jtype ValueType, value interface{}, err error) bool {
 	isFound := (jtype != NotExist)
 	isErr := (err != nil)
 
@@ -420,7 +420,7 @@ func checkFoundAndNoError(t *testing.T, testKind string, test Test, jtype int, v
 	}
 }
 
-func runTests(t *testing.T, tests []Test, runner func(Test) (interface{}, int, error), typeChecker func(Test, interface{}) (bool, interface{})) {
+func runTests(t *testing.T, tests []Test, runner func(Test) (interface{}, ValueType, error), typeChecker func(Test, interface{}) (bool, interface{})) {
 	for _, test := range tests {
 		if activeTest != "" && test.desc != activeTest {
 			continue
@@ -451,7 +451,7 @@ func runTests(t *testing.T, tests []Test, runner func(Test) (interface{}, int, e
 
 func TestGet(t *testing.T) {
 	runTests(t, getTests,
-		func(test Test) (value interface{}, dataType int, err error) {
+		func(test Test) (value interface{}, dataType ValueType, err error) {
 			value, dataType, _, err = Get([]byte(test.json), test.path...)
 			return
 		},
@@ -464,7 +464,7 @@ func TestGet(t *testing.T) {
 
 func TestGetString(t *testing.T) {
 	runTests(t, getStringTests,
-		func(test Test) (value interface{}, dataType int, err error) {
+		func(test Test) (value interface{}, dataType ValueType, err error) {
 			value, err = GetString([]byte(test.json), test.path...)
 			return value, String, err
 		},
@@ -477,7 +477,7 @@ func TestGetString(t *testing.T) {
 
 func TestGetInt(t *testing.T) {
 	runTests(t, getIntTests,
-		func(test Test) (value interface{}, dataType int, err error) {
+		func(test Test) (value interface{}, dataType ValueType, err error) {
 			value, err = GetInt([]byte(test.json), test.path...)
 			return value, Number, err
 		},
@@ -490,7 +490,7 @@ func TestGetInt(t *testing.T) {
 
 func TestGetFloat(t *testing.T) {
 	runTests(t, getFloatTests,
-		func(test Test) (value interface{}, dataType int, err error) {
+		func(test Test) (value interface{}, dataType ValueType, err error) {
 			value, err = GetFloat([]byte(test.json), test.path...)
 			return value, Number, err
 		},
@@ -503,7 +503,7 @@ func TestGetFloat(t *testing.T) {
 
 func TestGetBoolean(t *testing.T) {
 	runTests(t, getBoolTests,
-		func(test Test) (value interface{}, dataType int, err error) {
+		func(test Test) (value interface{}, dataType ValueType, err error) {
 			value, err = GetBoolean([]byte(test.json), test.path...)
 			return value, Boolean, err
 		},
@@ -516,7 +516,7 @@ func TestGetBoolean(t *testing.T) {
 
 func TestGetSlice(t *testing.T) {
 	runTests(t, getArrayTests,
-		func(test Test) (value interface{}, dataType int, err error) {
+		func(test Test) (value interface{}, dataType ValueType, err error) {
 			value, dataType, _, err = Get([]byte(test.json), test.path...)
 			return
 		},
