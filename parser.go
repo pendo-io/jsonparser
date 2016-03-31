@@ -116,6 +116,7 @@ func searchKeys(data []byte, keys ...string) int {
 			if valueOffset == -1 {
 				return -1
 			}
+
 			i += valueOffset
 
 			if i >= ln {

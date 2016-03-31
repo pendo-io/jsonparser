@@ -146,7 +146,11 @@ var getTests = []Test{
 	},
 	Test{
 		desc:    `no padding + nested`,
+<<<<<<< HEAD
 		json:    `{"a":{"a":1},"b":2}`,
+=======
+		json:    `{"a":{"a":"1"},"b":2}`,
+>>>>>>> master-official
 		path:    []string{"b"},
 		isFound: true,
 		data:    `2`,
