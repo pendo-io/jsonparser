@@ -11,13 +11,16 @@ import (
 
 // Errors
 var (
-	KeyPathNotFoundError = errors.New("Key path not found")
+	KeyPathNotFoundError  = errors.New("Key path not found")
 	UnknownValueTypeError = errors.New("Unknown value type")
-	MalformedJsonError = errors.New("Malformed JSON error")
-	MalformedStringError = errors.New("Value is string, but can't find closing '\"' symbol")
-	MalformedArrayError = errors.New("Value is array, but can't find closing ']' symbol")
-	MalformedObjectError = errors.New("Value looks like object, but can't find closing '}' symbol")
-	MalformedValueError = errors.New("Value looks like Number/Boolean/None, but can't find its end: ',' or '}' symbol")
+	MalformedJsonError    = errors.New("Malformed JSON error")
+	MalformedStringError  = errors.New("Value is string, but can't find closing '\"' symbol")
+	MalformedArrayError   = errors.New("Value is array, but can't find closing ']' symbol")
+	MalformedObjectError  = errors.New("Value looks like object, but can't find closing '}' symbol")
+	MalformedNumberError  = errors.New("Value looks like number, but can't find its end: ',' or '}' symbol")
+	MalformedLiteralError = errors.New("Value looks like Boolean/null, but can't find its end: ',' or '}' symbol")
+
+	ExpectedArrayError = errors.New("Expected an array as input, but received something that is not an array")
 )
 
 func tokenEnd(data []byte) int {
@@ -31,21 +34,40 @@ func tokenEnd(data []byte) int {
 	return -1
 }
 
+// Find position of next character that is not whitespace
+func nextToken(data []byte) int {
+	for i, c := range data {
+		switch c {
+		case ' ', '\n', '\r', '\t':
+			continue
+		default:
+			return i
+		}
+	}
 
-// Find position of next character which is not ' ', ',', '}' or ']'
-func nextToken(data []byte, skipComma bool) int {
+	return -1
+}
+
+// Find position of next element in an array by skipping whitespace and exactly one comma.
+// If a non-whitespace, non-comma character is hit before hitting a comma, returns an error (-1)
+func nextArrayElement(data []byte) int {
+	seenComma := false
 	for i, c := range data {
 		switch c {
 		case ' ', '\n', '\r', '\t':
 			continue
 		case ',':
-			if !skipComma {
-				continue
+			if seenComma {
+				return -1
+			} else {
+				seenComma = true
+			}
+		default:
+			if !seenComma {
+				return -1
 			} else {
 				return i
 			}
-		default:
-			return i
 		}
 	}
 
@@ -57,6 +79,7 @@ func nextToken(data []byte, skipComma bool) int {
 func stringEnd(data []byte) int {
 	for i, c := range data {
 		if c == '"' {
+			// Check backwards for backslashes to determine if the quote is escaped
 			j := i - 1
 			for {
 				if j < 0 || data[j] != '\\' {
@@ -125,7 +148,7 @@ func searchKeys(data []byte, keys ...string) int {
 			i += strEnd
 			keyEnd := i - 1
 
-			valueOffset := nextToken(data[i:], true)
+			valueOffset := nextToken(data[i:])
 			if valueOffset == -1 {
 				return -1
 			}
@@ -133,10 +156,10 @@ func searchKeys(data []byte, keys ...string) int {
 			i += valueOffset
 
 			// if string is a Key, and key level match
-			if data[i] == ':'{
+			if data[i] == ':' {
 				key := unsafeBytesToString(data[keyBegin:keyEnd])
 
-			 	if keyLevel == level-1 && // If key nesting level match current object nested level
+				if keyLevel == level-1 && // If key nesting level match current object nested level
 					keys[level-1] == key {
 					keyLevel++
 					// If we found all keys in path
@@ -177,12 +200,6 @@ const (
 	Unknown
 )
 
-var (
-	trueLiteral  = []byte("true")
-	falseLiteral = []byte("false")
-	nullLiteral  = []byte("null")
-)
-
 /*
 Get - Receives data structure, and key path to extract value from.
 
@@ -198,92 +215,76 @@ If no keys provided it will try to extract closest JSON value (simple ones or ob
 func Get(data []byte, keys ...string) (value []byte, dataType ValueType, offset int, err error) {
 	if len(keys) > 0 {
 		if offset = searchKeys(data, keys...); offset == -1 {
-			return []byte{}, NotExist, -1, KeyPathNotFoundError
+			return nil, NotExist, -1, KeyPathNotFoundError
 		}
 	}
 
 	// Go to closest value
-	nO := nextToken(data[offset:], false)
-
-	if nO == -1 {
-		return []byte{}, NotExist, -1, MalformedJsonError
-	}
-
-	offset += nO
-
-	endOffset := offset
-	// if string value
-	if data[offset] == '"' {
-		dataType = String
-		if idx := stringEnd(data[offset+1:]); idx != -1 {
-			endOffset += idx + 1
-		} else {
-			return []byte{}, dataType, offset, MalformedStringError
-		}
-	} else if data[offset] == '[' { // if array value
-		dataType = Array
-		// break label, for stopping nested loops
-		endOffset = blockEnd(data[offset:], '[', ']')
-
-		if endOffset == -1 {
-			return []byte{}, dataType, offset, MalformedArrayError
-		}
-
-		endOffset += offset
-	} else if data[offset] == '{' { // if object value
-		dataType = Object
-		// break label, for stopping nested loops
-		endOffset = blockEnd(data[offset:], '{', '}')
-
-		if endOffset == -1 {
-			return []byte{}, dataType, offset, MalformedObjectError
-		}
-
-		endOffset += offset
+	if skipToToken := nextToken(data[offset:]); skipToToken == -1 {
+		return nil, Unknown, -1, errors.New("Malformed JSON error")
 	} else {
-		// Number, Boolean or None
-		end := tokenEnd(data[endOffset:])
+		offset += skipToToken
+	}
 
-		if end == -1 {
-			return nil, dataType, offset, MalformedValueError
+	if value, dataType, valueOffset, err := GetValue(data[offset:]); err != nil {
+		return nil, Unknown, -1, err
+	} else {
+		return value, dataType, offset + valueOffset, nil
+	}
+}
+
+// JSON literal keywords as byte slices for comparison in Get()
+var (
+	trueLiteral  = []byte("true")
+	falseLiteral = []byte("false")
+	nullLiteral  = []byte("null")
+)
+
+func GetValue(data []byte) (value []byte, dataType ValueType, offset int, err error) {
+	if len(data) == 0 {
+		return nil, Unknown, -1, UnknownValueTypeError
+	}
+
+	switch data[0] {
+	case '"': // string value
+		if strEndQuoteOffMinus1 := stringEnd(data[1:]); strEndQuoteOffMinus1 == -1 {
+			return nil, Unknown, -1, MalformedStringError
+		} else {
+			return data[1:strEndQuoteOffMinus1], String, strEndQuoteOffMinus1 + 1, nil
 		}
-
-		value := data[offset : endOffset+end]
-
-		switch data[offset] {
-		case 't', 'f': // true or false
-			if bytes.Equal(value, trueLiteral) || bytes.Equal(value, falseLiteral) {
-				dataType = Boolean
-			} else {
-				return nil, Unknown, offset, UnknownValueTypeError
-			}
-		case 'u', 'n': // undefined or null
-			if bytes.Equal(value, nullLiteral) {
-				dataType = Null
-			} else {
-				return nil, Unknown, offset, UnknownValueTypeError
-			}
-		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-':
-			dataType = Number
-		default:
-			return nil, Unknown, offset, UnknownValueTypeError
+	case '[': // if array value
+		if blockLen := blockEnd(data, '[', ']'); blockLen == -1 {
+			return nil, Unknown, -1, MalformedArrayError
+		} else {
+			return data[:blockLen], Array, blockLen, nil
 		}
-
-		endOffset += end
+	case '{': // if object value
+		if blockLen := blockEnd(data, '{', '}'); blockLen == -1 {
+			return nil, Unknown, -1, MalformedObjectError
+		} else {
+			return data[:blockLen], Object, blockLen, nil
+		}
+	case 't', 'f', 'n': // true, false, or nil
+		if tokenLen := tokenEnd(data); tokenLen == -1 {
+			return nil, Unknown, -1, MalformedLiteralError
+		} else {
+			if value := data[:tokenLen]; bytes.Equal(value, nullLiteral) {
+				return nil, Null, tokenLen, nil
+			} else if bytes.Equal(value, trueLiteral) || bytes.Equal(value, falseLiteral) {
+				return value, Boolean, tokenLen, nil
+			} else {
+				return nil, Unknown, -1, UnknownValueTypeError
+			}
+		}
+	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-':
+		if tokenLen := tokenEnd(data); tokenLen == -1 {
+			return nil, Unknown, -1, MalformedNumberError
+		} else {
+			return data[:tokenLen], Number, tokenLen, nil
+		}
+	default:
+		return nil, Unknown, -1, errors.New("Unknown value type")
 	}
-
-	value = data[offset:endOffset]
-
-	// Strip quotes from string values
-	if dataType == String {
-		value = value[1 : len(value)-1]
-	}
-
-	if dataType == Null {
-		value = []byte{}
-	}
-
-	return value, dataType, endOffset, nil
 }
 
 func nextArrayItem(data []byte) int {
@@ -301,62 +302,45 @@ func nextArrayItem(data []byte) int {
 
 // ArrayEach is used when iterating arrays, accepts a callback function with the same return arguments as `Get`.
 func ArrayEach(data []byte, cb func(value []byte, dataType ValueType, offset int, err error), keys ...string) (err error) {
-	if len(data) == 0 {
-		return MalformedObjectError
-	}
+	if arrayValue, dataType, arrayOffset, err := Get(data, keys...); err != nil {
+		return err
+	} else if dataType != Array {
+		return ExpectedArrayError
+	} else {
+		arrayBeginOffset := arrayOffset - len(arrayValue) // overall offset of arrayValue within data
+		offsetInArray := 1                                // skip the '[' (guaranteed to exist because we know it's an Array type)
 
-	offset := 1
-
-	if len(keys) > 0 {
-		if offset = searchKeys(data, keys...); offset == -1 {
-			return KeyPathNotFoundError
-		}
-
-		// Go to closest value
-		nO := nextToken(data[offset:], false)
-
-		if nO == -1 {
-			return MalformedJsonError
-		}
-
-		offset += nO
-
-		if data[offset] != '[' {
+		// Skip to the first value in the array
+		if skipToFirstValue := nextToken(arrayValue[offsetInArray:]); skipToFirstValue == -1 {
 			return MalformedArrayError
+		} else {
+			offsetInArray += skipToFirstValue
 		}
 
-		offset++
-	}
+		// Keep processing elements until we hit the end of the array (or there's an error inside the array)
+		endOffsetInArray := len(arrayValue) - 1
+		for offsetInArray < endOffsetInArray {
+			elementValue, elementType, elementOffset, err := GetValue(arrayValue[offsetInArray:])
+			offsetInArray += elementOffset // update offsetInArray before calling cb() so that it points to the end of the element value
 
-	for true {
-		v, t, o, e := Get(data[offset:])
+			// If we have reached the end of the array, stop. Otherwise, invoke the callback (even if an error occurred)
+			if elementType == NotExist {
+				break
+			} else {
+				cb(elementValue, elementType, arrayBeginOffset+offsetInArray, err)
+			}
 
-		if o == 0 {
-			break
-		}
+			// If we received an error, stop.
+			if err != nil {
+				break
+			}
 
-		if t != NotExist {
-			cb(v, t, o, e)
-		}
-
-		if e != nil {
-			break
-		}
-
-		offset += o
-
-		nextItem := nextArrayItem(data[offset:])
-		if nextItem == -1 {
-			return MalformedArrayError
-		}
-		offset += nextItem
-
-		if data[offset] == ']' {
-			break
-		}
-
-		if data[offset] != ',' {
-			return MalformedArrayError
+			// Skip to the next value in the array
+			if skipToNextValue := nextArrayElement(arrayValue[offsetInArray:]); skipToNextValue == -1 {
+				return MalformedArrayError
+			} else {
+				offsetInArray += skipToNextValue
+			}
 		}
 	}
 
