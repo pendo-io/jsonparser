@@ -4,6 +4,7 @@ import (
 	"bytes"
 	_ "fmt"
 	"reflect"
+	"runtime"
 	"testing"
 )
 
@@ -379,6 +380,13 @@ var getArrayTests = []Test{
 		data:    []string{`1`, `2`, `3`, `4`},
 	},
 	Test{
+		desc:    `read array of strings`,
+		json:    `{"a": { "b":["1","2","3","4"]}}`,
+		path:    []string{"a", "b"},
+		isFound: true,
+		data:    []string{`1`, `2`, `3`, `4`},
+	},
+	Test{
 		desc:    `read array via empty path`,
 		json:    `[1,2,3,4]`,
 		path:    []string{},
@@ -431,32 +439,42 @@ func checkFoundAndNoError(t *testing.T, testKind string, test Test, jtype ValueT
 	}
 }
 
+func runTest(t *testing.T, test Test, runner func(Test) (interface{}, ValueType, error), typeChecker func(Test, interface{}) (bool, interface{})) {
+	defer func() {
+		if pnc := recover(); pnc != nil {
+			stacktrace := make([]byte, 20971520) // hopefully enough to hold the stack trace...
+			length := runtime.Stack(stacktrace, true)
+			t.Errorf("TEST '%s' PANICED: %v\nStacktrace follows:\n%s", test.desc, pnc, string(stacktrace[:length]))
+		}
+	}()
+
+	value, dataType, err := runner(test)
+
+	if checkFoundAndNoError(t, "Get()", test, dataType, value, err) {
+		if test.data == nil {
+			t.Errorf("MALFORMED TEST: %v", test)
+			return
+		}
+
+		if ok, expected := typeChecker(test, value); !ok {
+			if expectedBytes, ok := expected.([]byte); ok {
+				expected = string(expectedBytes)
+			}
+			if valueBytes, ok := value.([]byte); ok {
+				value = string(valueBytes)
+			}
+			t.Errorf("Test '%s' expected to return value %v, but did returned %v instead", test.desc, expected, value)
+		}
+	}
+}
+
 func runTests(t *testing.T, tests []Test, runner func(Test) (interface{}, ValueType, error), typeChecker func(Test, interface{}) (bool, interface{})) {
 	for _, test := range tests {
 		if activeTest != "" && test.desc != activeTest {
 			continue
 		}
 
-		// fmt.Println("Running:", test.desc)
-
-		value, dataType, err := runner(test)
-
-		if checkFoundAndNoError(t, "Get()", test, dataType, value, err) {
-			if test.data == nil {
-				t.Errorf("MALFORMED TEST: %v", test)
-				continue
-			}
-
-			if ok, expected := typeChecker(test, value); !ok {
-				if expectedBytes, ok := expected.([]byte); ok {
-					expected = string(expectedBytes)
-				}
-				if valueBytes, ok := value.([]byte); ok {
-					value = string(valueBytes)
-				}
-				t.Errorf("Test '%s' expected to return value %v, but did returned %v instead", test.desc, expected, value)
-			}
-		}
+		runTest(t, test, runner, typeChecker)
 	}
 }
 
