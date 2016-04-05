@@ -1,6 +1,6 @@
 # Alternative JSON parser for Go (so far fastest)
 
-It does not require you to know the structure of the payload (eg. create structs), and allows accessing fields by providing the path to them. It is up to **10 times faster** then standard `encoding/json` package (depending on payload size and usage), **allocates almost no memory**. See benchmarks below.
+It does not require you to know the structure of the payload (eg. create structs), and allows accessing fields by providing the path to them. It is up to **10 times faster** then standard `encoding/json` package (depending on payload size and usage), **allocates no memory**. See benchmarks below.
 
 ## Rationale
 Originally I made this for a project that relies on a lot of 3rd party APIs that can be unpredictable and complex.
@@ -90,7 +90,7 @@ If no keys are provided it will try to extract the closest JSON value (simple on
 ```
 func GetString(data []byte, keys ...string) (val string, err error)
 ```
-Returns strings properly handing escaped and unicode characters. Note that this will cause additioal memory allocations.
+Returns strings properly handing escaped and unicode characters. Note that this will cause additional memory allocations.
 
 ### **`GetUnsafeString`**
 If you need string in your app, and ready to sacrifice with support of escaped symbols in favor of speed. It returns string mapped to exsting byte slice memory, without any allocations:
@@ -203,7 +203,7 @@ https://github.com/buger/jsonparser/blob/master/benchmark/benchmark_medium_paylo
 | mreiferson/go-ujson | **56972** | 11547 | 270 |
 | pquerna/ffjson | **20298** | **856** | **20** |
 | mailru/easyjson | **10512** | **336** | **12** |
-| buger/jsonparser | **15626** | **16** | **1** |
+| buger/jsonparser | **14560** | **0** | **0** |
 
 The difference between ffjson and jsonparser in CPU usage is smaller, while the memory consumption difference is growing. On the other hand `easyjson` shows remarkable performance for medium payload.
 
