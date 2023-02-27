@@ -13,7 +13,6 @@ import (
 	jlexer "github.com/mailru/easyjson/jlexer"
 	"github.com/mreiferson/go-ujson"
 	"github.com/pquerna/ffjson/ffjson"
-	"github.com/ugorji/go/codec"
 	"testing"
 	// "fmt"
 	"bytes"
@@ -229,19 +228,6 @@ func BenchmarkUjsonSmall(b *testing.B) {
 		json.Get("st").Float64()
 
 		nothing()
-	}
-}
-
-/*
-   github.com/ugorji/go/codec
-*/
-func BenchmarkUgirjiSmall(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		decoder := codec.NewDecoderBytes(smallFixture, new(codec.JsonHandle))
-		data := new(SmallPayload)
-		data.CodecDecodeSelf(decoder)
-
-		nothing(data.Uuid, data.Tz, data.Ua, data.St)
 	}
 }
 
