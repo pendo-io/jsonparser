@@ -13,7 +13,6 @@ import (
 	jlexer "github.com/mailru/easyjson/jlexer"
 	"github.com/mreiferson/go-ujson"
 	"github.com/pquerna/ffjson/ffjson"
-	"github.com/ugorji/go/codec"
 	"testing"
 	// "fmt"
 	"bytes"
@@ -279,24 +278,6 @@ func BenchmarkUjsonMedium(b *testing.B) {
 		}
 
 		nothing()
-	}
-}
-
-/*
-   github.com/ugorji/go/codec
-*/
-func BenchmarkUgirjiMedium(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		decoder := codec.NewDecoderBytes(mediumFixture, new(codec.JsonHandle))
-		data := new(MediumPayload)
-		json.Unmarshal(mediumFixture, &data)
-		data.CodecDecodeSelf(decoder)
-
-		nothing(data.Person.Name.FullName, data.Person.Github.Followers, data.Company)
-
-		for _, el := range data.Person.Gravatar.Avatars {
-			nothing(el.Url)
-		}
 	}
 }
 
