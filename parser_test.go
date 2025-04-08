@@ -1271,6 +1271,23 @@ func TestEachKey(t *testing.T) {
 	}
 }
 
+func TestEachKeyInvalidJson(t *testing.T) {
+	j := testJson[1:]
+
+	result := EachKey(j, func(idx int, value []byte, vt ValueType, err error) {
+		if idx != -1 {
+			t.Errorf("Expected -1 as the idx, but got %d", idx)
+		}
+		if err != MalformedJsonError {
+			t.Errorf("Expected MalformedJsonError, but got %v", err)
+		}
+	}, []string{"name"})
+
+	if result != -1 {
+		t.Errorf("Expected -1, but got %d", result)
+	}
+}
+
 type ParseTest struct {
 	in     string
 	intype ValueType

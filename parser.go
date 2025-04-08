@@ -419,6 +419,10 @@ func EachKey(data []byte, cb func(int, []byte, ValueType, error), paths ...[]str
 				} else {
 					keyUnesc = ku
 				}
+				if level < 1 {
+					cb(-1, nil, Unknown, MalformedJsonError)
+					return -1
+				}
 
 				for pi, p := range paths {
 					if len(p) < level || (pathFlags&bitwiseFlags[pi]) != 0 || (ignorePathFlags&bitwiseFlags[pi] != 0) {
