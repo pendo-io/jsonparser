@@ -653,7 +653,7 @@ func Delete(data []byte, keys ...string) []byte {
 	if !array {
 		if len(keys) > 1 {
 			_, _, startOffset, endOffset, err = internalGet(data, keys[:lk-1]...)
-			if err == KeyPathNotFoundError {
+			if err != nil {
 				// problem parsing the data
 				return data
 			}
@@ -665,7 +665,11 @@ func Delete(data []byte, keys ...string) []byte {
 			return data
 		}
 		keyOffset += startOffset
-		_, _, _, subEndOffset, _ := internalGet(data[startOffset:endOffset], keys[lk-1])
+		var subEndOffset int
+		_, _, _, subEndOffset, err = internalGet(data[startOffset:endOffset], keys[lk-1])
+		if err != nil {
+			return data
+		}
 		endOffset = startOffset + subEndOffset
 		tokEnd := tokenEnd(data[endOffset:])
 		tokStart := findTokenStart(data[:keyOffset], ","[0])
@@ -679,7 +683,7 @@ func Delete(data []byte, keys ...string) []byte {
 		}
 	} else {
 		_, _, keyOffset, endOffset, err = internalGet(data, keys...)
-		if err == KeyPathNotFoundError {
+		if err != nil {
 			// problem parsing the data
 			return data
 		}

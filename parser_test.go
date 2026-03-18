@@ -227,6 +227,24 @@ var deleteTests = []DeleteTest{
 		path: []string{"test"},
 		data: `   {}`,
 	},
+	{
+		desc: "GO-2026-4514: malformed JSON without enclosing braces should not panic",
+		json: `"0":"0":`,
+		path: []string{"0"},
+		data: `"0":"0":`,
+	},
+	{
+		desc: "GO-2026-4514: malformed JSON with key but truncated value should not panic",
+		json: `{"a":  `,
+		path: []string{"a"},
+		data: `{"a":  `,
+	},
+	{
+		desc: "GO-2026-4514: malformed nested JSON with truncated value should not panic",
+		json: `{"a":{"b":  `,
+		path: []string{"a", "b"},
+		data: `{"a":{"b":  `,
+	},
 }
 
 var setTests = []SetTest{
